@@ -81,7 +81,7 @@ class ItemController extends Controller
     	$itemdata=Item::with('itemimagedetails')->select('item.id','item.item_name','item.item_description','item.item_price','item.item_status','categories.category_name','item.cat_id')
     	->join('categories','item.cat_id','=','categories.id')
     	->where('item.id',$request['item_id'])->get()->first();
-        $topping=Item::with('itemimagedetails')->select('item.id','item.item_name','item.item_description','item.item_price','item.item_status')
+        $topping=Item::with('itemimage')->select('item.id','item.item_name as name','item.item_price as price')
     	->where('item.type_food',2)
         ->where('item.cat_id',$itemdata->cat_id)->get();
 

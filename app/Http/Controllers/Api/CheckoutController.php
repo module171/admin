@@ -30,42 +30,41 @@ class CheckoutController extends Controller
 {
     public function summary(Request $request)
     {
-        if($request->user_id == ""){
-            return response()->json(["status"=>0,"message"=>"User ID is required"],400);
-        }
 
 
 
         $taxval=ModelsUser::select('users.tax','users.delivery_charge')->where('users.id','1')
         ->get()->first();
-        $cartdata=$request->cart;
+        $cartdata=$request->cartdata;
 
         foreach ($cartdata as $value) {
 
 
-            $arr1 = explode(',', $value['topping_id']);
+            $arr1 = explode(',', $value['addons_id']);
             $item=item::with('itemimage')
 
             ->select('item.id','item.item_name','item.item_price','item.item_description')
             ->where('id',$value['item_id'])
             ->first();
-            $topping = item::whereIn('id',$arr1)
+            $topping = item::with('itemimage')
+
+            -> whereIn('id',$arr1)
             ->where('type_food',2)
-            ->select('item_name','item_price','id','item_description')
+            ->select('item_name as name','item_price as price','item.id')
             ->get();
 
             // $images = ItemImages::where('id',$value['item_id'])->get();
 
             $data[] = array(
-                "id" => $value['item_id'],
+                "id" => $value['id'],
                 "qty" => $value['qty'],
-                "total_price" => $value['total_price'],
+                "total_price" => $value['price'],
                 "item_name" =>$item->item_name,
                 "item_price" =>$item->item_price,
-                // "item_id" =>$item->item_id,
+                "item_id" =>$item->item_id,
                 "item_notes" => $value['item_notes'],
-                "topping" =>$topping,
-                "itemimage" =>$item->itemimage,
+                "addons" =>$topping,
+                "itemimage" =>$value['image'],
             );
         }
 
@@ -78,7 +77,7 @@ class CheckoutController extends Controller
 
         if(!empty($cartdata))
         {
-            return response()->json(['status'=>1,'message'=>'Summery list Successful','data'=>@$data  ],200);
+            return response()->json(['status'=>1,'message'=>'Summery list Successful','data'=>@$data,'summery'=>$summery],200);
         }
         else
         {
@@ -149,7 +148,7 @@ class CheckoutController extends Controller
 
                 $order_id = DB::getPdo()->lastInsertId();
 
-                $cartdata=$request->cart;
+                $cartdata=$request->cartdata;
                 foreach ($cartdata as $value) {
                     $OrderPro = new orderdetail();
                     $OrderPro->order_id = $order_id;
@@ -223,19 +222,28 @@ class CheckoutController extends Controller
                 if ($request->order_type == "2") {
                     $delivery_charge = "0.00";
                     $address = "";
-
+                    $lat = "";
+                    $lang = "";
                     $order_total = $request->order_total-$request->$delivery_charge;
                 } else {
 
                     if($request->address == ""){
                         return response()->json(["status"=>0,"message"=>"Address is required"],400);
                     }
+                    if($request->lat == ""){
+                        return response()->json(["status"=>0,"message"=>"Please select the address from suggestion"],400);
+                    }
+
+                    if($request->lang == ""){
+                        return response()->json(["status"=>0,"message"=>"Please select the address from suggestion"],400);
+                    }
 
 
 
                     $delivery_charge = $request->delivery_charge;
                     $address = $request->address;
-
+                    $lat = $request->lat;
+                    $lang = $request->lang;
                     $order_total = $request->order_total;
 
                 }
@@ -248,7 +256,8 @@ class CheckoutController extends Controller
                 $order->order_type =$request->order_type;
                 $order->status ='1';
                 $order->address =$address;
-
+                $order->lat =$lat;
+                $order->lang =$lang;
                 $order->promotecode =$request->promocode;
                 $order->discount_amount =$request->discount_amount;
                 $order->discount_pr =$request->discount_pr;
@@ -261,14 +270,15 @@ class CheckoutController extends Controller
 
 
                 $order_id = DB::getPdo()->lastInsertId();
-                $cartdata=$request->cart;
+                $cartdata=$request->cartdata;
                 foreach ($cartdata as $value) {
                     $OrderPro = new orderdetail();
                     $OrderPro->order_id = $order_id;
 
                     $OrderPro->item_id = $value['item_id'];
-
-                    $OrderPro->qly = $value['qly'];
+                    $OrderPro->item_notes=$value['item_notes'];
+                    $OrderPro->addons_id=$value['addons_id'];
+                    $OrderPro->qly = $value['qty'];
 
                     $OrderPro->save();
 
@@ -327,7 +337,7 @@ class CheckoutController extends Controller
                 }catch(\Swift_TransportException $e){
                     $response = $e->getMessage() ;
                     // return Redirect::back()->with('danger', $response);
-                    return response()->json(['status'=>0,'message'=>'Something went wrong while sending email Please try again...'],200);
+                    return response()->json(['status'=>0,'message'=>$response ],200);
                 }
 
                 return response()->json(['status'=>1,'message'=>'Order has been placed'],200);
@@ -345,7 +355,7 @@ class CheckoutController extends Controller
             return response()->json(["status"=>0,"message"=>"User ID is required"],400);
         }
         \DB::statement("SET SQL_MODE=''");
-        $cartdata=orderdetail::select('order.order_total as total_price',DB::raw('SUM(order_detail.qly) AS qly'),'order.id','order.order_type','order.order_number','order.status','order.payment_type',DB::raw('DATE_FORMAT(order.created_at, "%d-%m-%Y") as date'))
+        $cartdata=orderdetail::select('order.order_total as total_price',DB::raw('SUM(order_detail.qly) AS qty'),'order.id','order.order_type','order.order_number','order.status','order.payment_type',DB::raw('DATE_FORMAT(order_detail.created_at, "%d-%m-%Y") as date'))
         ->join('item','order_detail.item_id','=','item.id')
         ->join('order','order_detail.order_id','=','order.id')
         ->where('order.user_id',$request->user_id)->groupBy('order_detail.order_id')->orderBy('order_detail.order_id', 'DESC')->get();
@@ -359,6 +369,25 @@ class CheckoutController extends Controller
             return response()->json(['status'=>0,'message'=>'No data found'],200);
         }
     }
+    public function deleteorder(Request $request)
+    {
+        if($request->user_id == ""){
+            return response()->json(["status"=>0,"message"=>"User ID is required"],400);
+        }
+        if($request->order_id == ""){
+            return response()->json(["status"=>0,"message"=>"User ID is required"],400);
+        }
+         $status=ModelsOrder::where('id',intval($request->order_id))->delete();
+         $status1=orderdetail::where('order_id',intval($request->order_id))->delete();
+        if($status==1 ||$status1==1)
+        {
+            return response()->json(['status'=>1,'message'=>'xoa thanh cong'],200);
+        }
+        else
+        {
+            return response()->json(['status'=>0,'message'=>'xoa that bai'],200);
+        }
+    }
 
     public function getorderdetails(Request $request)
     {
@@ -366,7 +395,7 @@ class CheckoutController extends Controller
             return response()->json(["status"=>0,"message"=>"Order Number is required"],400);
         }
 
-        $cartdata=orderdetail::with('itemimage')->select('order_detail.qly','item.item_price as total_price','item.id','item.item_name','item.item_price','order_detail.item_id')
+        $cartdata=orderdetail::with('itemimage')->select('order_detail.qly','order_detail.item_notes','order_detail.addons_id','item.item_price as total_price','item.id','item.item_name','item.item_price','order_detail.item_id')
         ->join('item','order_detail.item_id','=','item.id')
         ->join('order','order_detail.order_id','=','order.id')
         ->where('order_detail.order_id',$request->order_id)->get()->toArray();
@@ -387,8 +416,8 @@ class CheckoutController extends Controller
 
         foreach ($cartdata as $value) {
 
-            // $arr = explode(',', $value['addons_id']);
-            // $addons = Addons::whereIn('id',$arr)->get();
+            $arr = explode(',', $value['addons_id']);
+            $addons = item::whereIn('id',$arr)->select('id','item_price as price','item_name as name')->get();
 
             // $images = ItemImages::where('id',$value['item_id'])->get();
 
@@ -399,8 +428,8 @@ class CheckoutController extends Controller
                 "item_name" => $value['item_name'],
                 "item_price" => $value['item_price'],
                 "item_id" => $value['item_id'],
-
-
+                "item_notes" => $value['item_notes'],
+                "addons" => $addons,
                 "itemimage" => $value["itemimage"]
             );
         }

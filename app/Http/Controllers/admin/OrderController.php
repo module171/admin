@@ -25,7 +25,7 @@ class OrderController extends Controller
 
         //   $order->item()->attach(12,['qly'=>4]);
         //   $order->item()->attach(13,['qly'=>4]);
-       $getorders = Order::with('user')->select('order.*','users.name')->leftJoin('users', 'order.delivery_id', '=', 'users.id')->where('order.created_at','LIKE','%' .date("Y-m-d") . '%')->get();
+       $getorders = Order::with(['user','order_detail'])->select('order.*','users.name')->leftJoin('users', 'order.delivery_id', '=', 'users.id')->get();
        $getdriver = shipper::get();
        return view('page.order',compact('title','getorders','getdriver','order'));
     }

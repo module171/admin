@@ -10,7 +10,7 @@ class order extends Model
     use HasFactory;
     protected $table='order';
     protected $fillable=['user_id','order_number','payment_id','address','promocode','tax','delivery_id','order_notes','status'];
-    public $timestamps = false;
+
     /**
      * The item that belong to the order
      *
@@ -20,7 +20,10 @@ class order extends Model
     {
         return $this->belongsToMany(item::class, 'order_detail', 'order_id', 'item_id')->withPivot('qly');
     }
-
+    public function order_detail()
+    {
+        return $this->hasOne(orderdetail::class, 'order_id', 'id');
+    }
     /**
      * The promodecode that belong to the order
      *

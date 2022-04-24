@@ -9,7 +9,7 @@ class orderdetail extends Model
 {
     use HasFactory;
     protected $table='order_detail';
-    protected $fillable=['item_id','order_id','qly'];
+    protected $fillable=['item_id','order_id','qly','addons_id','item_notes'];
     public function itemimage(){
         return $this->hasOne(ItemImages::class,'item_id','item_id')->select('item_images.id','item_images.item_id',\DB::raw("CONCAT('".url('/public/images/item/')."/', item_images.image) AS image"));
     }

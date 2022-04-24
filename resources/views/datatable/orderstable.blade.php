@@ -19,7 +19,10 @@
         <?php
         $i = 1;
         foreach ($getorders as $orders) {
+
         ?>
+
+
         <tr id="dataid{{$orders->id}}">
             <td>{{$i}}</td>
             <td>{{$orders['user']->name}}</td>

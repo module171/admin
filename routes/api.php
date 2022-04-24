@@ -58,6 +58,7 @@ Route::group(['namespace'=>'api'],function (){
     Route::post('orderhistory',[Checkout::class, 'orderhistory']);
     Route::post('getorderdetails',[Checkout::class, 'getorderdetails']);
     Route::post('ordercancel',[Checkout::class, 'ordercancel']);
+    Route::post('deleteorder',[Checkout::class, 'deleteorder']);
     Route::get('promocodelist',[Checkout::class, 'promocodelist']);
     Route::post('promocode',[Checkout::class, 'promocode']);
     Route::post('exploreitem',[Checkout::class, 'exploreitem']);
